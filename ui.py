@@ -1,12 +1,14 @@
 from PyQt5.QtCore import (QDate, QDateTime, QRegExp, QSortFilterProxyModel, Qt,
-        QTime)
+        QTime, QThread, pyqtSignal)
 from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout,
         QGroupBox, QHBoxLayout, QLabel, QLineEdit, QTreeView, QVBoxLayout,
-        QWidget, QAbstractItemView, QTextEdit, QSplitter)
-from packet import nextPacket
+        QWidget, QAbstractItemView, QTextEdit, QSplitter, QInputDialog)
+from packet import Packet, nextPacket
+from starter import *
 import time
 import hexdump
+import subprocess
 
 
 # SUBJECT, SENDER, DATE = range(3)
@@ -144,23 +146,55 @@ class Window(QWidget):
         else:
             self.detailLabel.setText(str(packet.tcp_data))
         self.rawLabel.setText(hexdump.hexdump(packet.tcp_data.raw,'return'))
-        
+
+    def moniter(self, filename):
+        self.monitor_thread = MonitorThread(filename)
+        self.monitor_thread.start()
+        self.monitor_thread.trigger.connect(self.addModel)
+
+class MonitorThread(QThread):
+    trigger = pyqtSignal(Packet)
+    def __init__(self, filename):
+        self.filename = filename
+        super(MonitorThread, self).__init__()
+    
+    def run(self):
+        with open(self.filename,"rb") as f:
+            while True:
+                packet = nextPacket(f)
+                if packet != None:
+                    #self.addModel(packet)
+                    self.trigger.emit(packet)
+                else:
+                    time.sleep(3)
+
 if __name__ == '__main__':
 
     import sys
 
-    app = QApplication(sys.argv)
+    qApplication = QApplication(sys.argv)
     window = Window()
-    # window.setSourceModel(createModel(window))
     window.show()
 
-    with open("/Users/guxin/Downloads/r0capture/test.pcap","rb") as f:
-        while True:
-            packet = nextPacket(f)
-            #print(packet)
-            if packet != None:
-                window.addModel(packet)
-            else:
-                break
+    apps = enumerate_apps()
 
-    sys.exit(app.exec_())
+    if apps != None and len(apps) > 0:
+        name,ok = QInputDialog().getItem(window, "选择 App", "可选列表", (app.name for app in apps), 0 , False)
+    if ok:
+        app = [child for child in apps if child.name == name][0]
+        subprocess.call("cd r0capture", shell=True)
+        if hasattr(app,"pid"):
+            # TODO attach 模式
+            print(subprocess.check_output("ls"))
+            print("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name))
+            subprocess.Popen("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+        else:
+            # TODO spawn 模式
+            subprocess.run("cd r0capture && python3 r0capture.py -U -f %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+
+        #import threading
+        # threading.Thread(target=Window.monitoring, args=(window, filename)).start()
+        time.sleep(1)
+        window.moniter("r0capture/%s.pcap" % app.name)
+
+    sys.exit(qApplication.exec_())
