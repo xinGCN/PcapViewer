@@ -1,14 +1,15 @@
-from PyQt5.QtCore import (QDate, QDateTime, QRegExp, QSortFilterProxyModel, Qt,
-        QTime, QThread, pyqtSignal)
+from PyQt5.QtCore import (QRegExp, QSortFilterProxyModel, Qt, QThread, pyqtSignal)
 from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout,
-        QGroupBox, QHBoxLayout, QLabel, QLineEdit, QTreeView, QVBoxLayout,
-        QWidget, QAbstractItemView, QTextEdit, QSplitter, QInputDialog)
+        QGroupBox, QLabel, QLineEdit, QTreeView, QVBoxLayout,
+        QWidget, QAbstractItemView, QTextEdit, QSplitter, QInputDialog, QAction, QMenuBar, QMessageBox)
 from packet import Packet, nextPacket
 from starter import *
 import time
 import hexdump
 import subprocess
+import signal
+import os       
 
 
 # SUBJECT, SENDER, DATE = range(3)
@@ -17,6 +18,12 @@ NUMBER, TIME, SOURCE, DESTINATION, PROTOCOL, LENGTH, INFO = range(7)
 class Window(QWidget):
     def __init__(self):
         super(Window, self).__init__()
+        
+        self.menu = QMenuBar(self)
+        newAct = QAction('打开', self)   
+        newAct.triggered.connect(self.chooseApps)     
+        self.menu.addMenu('文件').addAction(newAct)
+        
 
         self.global_packets = []
         self.proxyModel = QSortFilterProxyModel()
@@ -152,6 +159,38 @@ class Window(QWidget):
         self.monitor_thread.start()
         self.monitor_thread.trigger.connect(self.addModel)
 
+    def chooseApps(self):
+        try:
+            apps = enumerate_apps()
+            if apps != None and len(apps) > 0:
+                name,ok = QInputDialog().getItem(window, "选择 App", "可选列表", (app.name for app in apps), 0 , False)
+                if ok:
+                    app = [child for child in apps if child.name == name][0]
+                    if app.pid != 0:
+                        # TODO attach 模式
+                        self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+                    else:
+                        # TODO spawn 模式
+                        self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U -f %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+                    print(self.worker)
+                    self.moniter("r0capture/%s.pcap" % app.name)
+        except frida.InvalidArgumentError as e1:
+            if str(e1) == "device not found":
+                # 处理找不到 usb 设备
+                QMessageBox.information(self, '提示框', '找不到 usb 设备')
+        except frida.ServerNotRunningError as e2:
+            if str(e2) == 'unable to connect to remote frida-server: closed':
+                # TODO 处理找不到 frida_server 进程
+                QMessageBox.information(self, '提示框', '处理找不到 frida_server 进程')
+                if frida_server_exist():
+                    start_frida_server()
+                else:
+                    
+
+    def closeEvent(self, event):
+        if hasattr(self, 'worker'):
+            os.killpg(os.getpgid(self.worker.pid), signal.SIGTERM)
+
 class MonitorThread(QThread):
     trigger = pyqtSignal(Packet)
     def __init__(self, filename):
@@ -159,6 +198,7 @@ class MonitorThread(QThread):
         super(MonitorThread, self).__init__()
     
     def run(self):
+        time.sleep(3)
         with open(self.filename,"rb") as f:
             while True:
                 packet = nextPacket(f)
@@ -175,26 +215,6 @@ if __name__ == '__main__':
     qApplication = QApplication(sys.argv)
     window = Window()
     window.show()
-
-    apps = enumerate_apps()
-
-    if apps != None and len(apps) > 0:
-        name,ok = QInputDialog().getItem(window, "选择 App", "可选列表", (app.name for app in apps), 0 , False)
-    if ok:
-        app = [child for child in apps if child.name == name][0]
-        subprocess.call("cd r0capture", shell=True)
-        if hasattr(app,"pid"):
-            # TODO attach 模式
-            print(subprocess.check_output("ls"))
-            print("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name))
-            subprocess.Popen("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name), shell=True)
-        else:
-            # TODO spawn 模式
-            subprocess.run("cd r0capture && python3 r0capture.py -U -f %s -p %s.pcap" % (app.identifier, app.name), shell=True)
-
-        #import threading
-        # threading.Thread(target=Window.monitoring, args=(window, filename)).start()
-        time.sleep(1)
-        window.moniter("r0capture/%s.pcap" % app.name)
+    window.chooseApps()
 
     sys.exit(qApplication.exec_())
