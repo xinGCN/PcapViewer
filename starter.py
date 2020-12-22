@@ -43,7 +43,7 @@ def kill_frida_server():
 
 def start_frida_server():
     kill_frida_server()
-    subprocess.call(['adb','shell','/data/local/tmp/frida-server &'])
+    subprocess.call(['adb','shell','/data/local/tmp/frida-server &'], timeout=1)
 
 def setup_frida_server(filename):
     subprocess.call(['adb','push',filename,'/data/local/tmp/frida-server'])
@@ -53,26 +53,32 @@ def setup_frida_server(filename):
 import requests
 import time
 
-def download_frida_server(name, url, callback):
+def download_frida_server(version, callback):
     # headers = {'Proxy-Connection':'keep-alive'}
+    name = "frida-server-" + version + "-android-x86.xz"
+    url = "https://github.com/frida/frida/releases/download/" + version + "/" + name
     r = requests.get(url, stream=True)
-    length = float(r.headers['content-length'])
-    f = open(name, 'wb')
-    count = 0
-    count_tmp = 0
-    time1 = time.time()
-    for chunk in r.iter_content(chunk_size = 512):
-        if chunk:
-            f.write(chunk)
-            count += len(chunk)
-            if time.time() - time1 > 2:
-                p = count / length * 100
-                speed = (count - count_tmp) / 1024 / 1024 / 2
-                count_tmp = count
-                callback(formatFloat(p), formatFloat(speed))
-                #print(name + ': ' + formatFloat(p) + '%' + ' Speed: ' + formatFloat(speed) + 'M/S')
-                time1 = time.time()
-    f.close()
+    print(r.status_code)
+    if r.status_code == 200:
+        length = float(r.headers['content-length'])
+        f = open(name, 'wb')
+        count = 0
+        count_tmp = 0
+        time1 = time.time()
+        for chunk in r.iter_content(chunk_size = 512):
+            if chunk:
+                f.write(chunk)
+                count += len(chunk)
+                if time.time() - time1 > 2:
+                    p = count / length * 100
+                    speed = (count - count_tmp) / 1024 / 1024 / 2
+                    count_tmp = count
+                    callback(formatFloat(p), formatFloat(speed))
+                    print(name + ': ' + formatFloat(p) + '%' + ' Speed: ' + formatFloat(speed) + 'M/S')
+                    time1 = time.time()
+        f.close()
+    else:
+        raise Exception("%s 返回 %s" %(url, r.status_code))
     
 def formatFloat(num):
     return '{:.2f}'.format(num)
@@ -80,4 +86,4 @@ def formatFloat(num):
 # v = find_frida_version()
 # address = "https://github.com/frida/frida/releases/download/" + v + "/frida-server-" + v + "-android-x86.xz"
 # print(address)
-# downloadFile("frida-server",address)
+# download_frida_server(find_frida_version())
