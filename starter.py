@@ -46,9 +46,10 @@ def start_frida_server():
     subprocess.call(['adb','shell','/data/local/tmp/frida-server &'], timeout=1)
 
 def setup_frida_server(filename):
-    subprocess.call(['adb','push',filename,'/data/local/tmp/frida-server'])
+    subprocess.call(['mv',filename,'tmp/frida-server.xz'])
+    subprocess.call(['unxz','tmp/frida-server.xz'])
+    subprocess.call(['adb','push','tmp/frida-server','/data/local/tmp/frida-server'])
     subprocess.call(['adb','shell','chmod 755 /data/local/tmp/frida-server'])
-
 
 import requests
 import time
@@ -56,7 +57,7 @@ import time
 def download_frida_server(version, callback):
     # headers = {'Proxy-Connection':'keep-alive'}
     name = "frida-server-" + version + "-android-x86.xz"
-    url = "https://github.com/frida/frida/releases/download/" + version + "/" + name
+    url = "https://github.com/frida/frida/releases/download/" + version + "/frida-server-" + version + "-android-x86.xz"
     r = requests.get(url, stream=True)
     print(r.status_code)
     if r.status_code == 200:
