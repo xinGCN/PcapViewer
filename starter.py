@@ -45,10 +45,11 @@ def start_frida_server():
     kill_frida_server()
     subprocess.call(['adb','shell','/data/local/tmp/frida-server &'], timeout=1)
 
-def setup_frida_server(filename):
-    subprocess.call(['mv',filename,'tmp/frida-server.xz'])
-    subprocess.call(['unxz','tmp/frida-server.xz'])
-    subprocess.call(['adb','push','tmp/frida-server','/data/local/tmp/frida-server'])
+def setup_frida_server():
+    filename = "frida-server-" + find_frida_version() + "-android-x86.xz"
+    subprocess.call(['mv',filename,'frida-server.xz'])
+    subprocess.call(['unxz','frida-server.xz'])
+    subprocess.call(['adb','push','frida-server','/data/local/tmp/frida-server'])
     subprocess.call(['adb','shell','chmod 755 /data/local/tmp/frida-server'])
 
 import requests

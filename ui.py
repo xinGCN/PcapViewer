@@ -160,51 +160,62 @@ class Window(QWidget):
         self.monitor_thread.trigger.connect(self.addModel)
 
     def chooseApps(self):
-        # try:
-        #     apps = enumerate_apps()
-        #     if apps != None and len(apps) > 0:
-        #         name,ok = QInputDialog().getItem(window, "选择 App", "可选列表", (app.name for app in apps), 0 , False)
-        #         if ok:
-        #             app = [child for child in apps if child.name == name][0]
-        #             if app.pid != 0:
-        #                 # TODO attach 模式
-        #                 self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name), shell=True)
-        #             else:
-        #                 # TODO spawn 模式
-        #                 self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U -f %s -p %s.pcap" % (app.identifier, app.name), shell=True)
-        #             print(self.worker)
-        #             self.moniter("r0capture/%s.pcap" % app.name)
-        # except frida.InvalidArgumentError as e1:
-        #     if str(e1) == "device not found":
-        #         # 处理找不到 usb 设备
-        #         QMessageBox.information(self, '提示框', '找不到 usb 设备')
-        # except frida.ServerNotRunningError as e2:
-        #     if str(e2) == 'unable to connect to remote frida-server: closed':
-        #         # TODO 处理找不到 frida_server 进程
-        #         # QMessageBox.information(self, '提示框', '处理找不到 frida_server 进程')
-        #         if frida_server_exist():
-        #             start_frida_server()
-        #         else:
-                    progress = QProgressDialog(self)
-                    progress.setWindowTitle("请稍等")  
-                    progress.setLabelText("当前车速 0M/S")
-                    progress.setWindowModality(Qt.WindowModal)
-                    progress.setRange(0, 100)
-
-                    def cancel():
-                        if hasattr(self, 'download_thread'):
-                            print("quit")
-                            self.download_thread.terminate()
-                    progress.canceled.connect(cancel)
-
-                    def update(args):
-                        progress.setValue(float(args[0]))
-                        progress.setLabelText("当前车速 %sM/S" % args[1])
-
-                    self.download_thread = DownloadThread()
-                    self.download_thread.start()
-                    self.download_thread.trigger.connect(update)
+        try:
+            apps = enumerate_apps()
+            if apps != None and len(apps) > 0:
+                name,ok = QInputDialog().getItem(window, "选择 App", "可选列表", (app.name for app in apps), 0 , False)
+                if ok:
+                    app = [child for child in apps if child.name == name][0]
+                    if app.pid != 0:
+                        # TODO attach 模式
+                        self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+                    else:
+                        # TODO spawn 模式
+                        self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U -f %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+                    print(self.worker)
+                    self.moniter("r0capture/%s.pcap" % app.name)
+        except frida.InvalidArgumentError as e1:
+            if str(e1) == "device not found":
+                # 处理找不到 usb 设备
+                QMessageBox.information(self, '提示', '找不到 usb 设备')
+        except frida.ServerNotRunningError as e2:
+            if str(e2) == 'unable to connect to remote frida-server: closed':
+                # TODO 处理找不到 frida_server 进程
+                if frida_server_exist():
+                    start_frida_server()
+                    self.chooseApps()
+                else:
+                    result = QMessageBox.question(self, '询问', "需要我帮你配置 frida-server 么?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if result == QMessageBox.Yes:
+                        self.download()
+                        setup_frida_server()
+                        start_frida_server()
+                        self.chooseApps()
+                    else:
+                        QMessageBox.information(self, '提示', '找不到 frida-server 程序')
+                    
     
+    def download(self):
+        progress = QProgressDialog(self)
+        progress.setWindowTitle("请稍等")  
+        progress.setLabelText("当前车速 0M/S")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setRange(0, 100)
+
+        def cancel():
+            if hasattr(self, 'download_thread'):
+                self.download_thread.terminate()
+
+        progress.canceled.connect(cancel)
+
+        def update(args):
+            progress.setValue(float(args[0]))
+            progress.setLabelText("当前车速 %sM/S" % args[1])
+
+        self.download_thread = DownloadThread()
+        self.download_thread.start()
+        self.download_thread.trigger.connect(update)        
+
     def closeEvent(self, event):
         if hasattr(self, 'worker'):
             os.killpg(os.getpgid(self.worker.pid), signal.SIGTERM)
