@@ -30,7 +30,7 @@ def enumerate_usb_devices():
     return [device for device in devices if device.type == 'usb']
 
 def find_frida_version():
-    return subprocess.check_output(["frida",'--v']).decode('utf-8').strip('\n')
+    return frida.__version__
 
 def frida_server_exist():
     result = subprocess.check_output(['adb', 'shell', 'ls /data/local/tmp']).decode('utf-8').strip('\n')
@@ -43,12 +43,15 @@ def kill_frida_server():
 
 def start_frida_server():
     kill_frida_server()
-    subprocess.call(['adb','shell','/data/local/tmp/frida-server &'], timeout=1)
+    try:
+        subprocess.call(['adb','shell','/data/local/tmp/frida-server &'], timeout=1)
+    except subprocess.TimeoutExpired as e:
+        pass
 
 def setup_frida_server():
     filename = "frida-server-" + find_frida_version() + "-android-x86.xz"
     subprocess.call(['mv',filename,'frida-server.xz'])
-    subprocess.call(['unxz','frida-server.xz'])
+    subprocess.call(['gunzip','frida-server.xz'])
     subprocess.call(['adb','push','frida-server','/data/local/tmp/frida-server'])
     subprocess.call(['adb','shell','chmod 755 /data/local/tmp/frida-server'])
 
@@ -78,6 +81,7 @@ def download_frida_server(version, callback):
                     callback(formatFloat(p), formatFloat(speed))
                     print(name + ': ' + formatFloat(p) + '%' + ' Speed: ' + formatFloat(speed) + 'M/S')
                     time1 = time.time()
+        callback("over","")
         f.close()
     else:
         raise Exception("%s 返回 %s" %(url, r.status_code))

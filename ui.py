@@ -187,15 +187,16 @@ class Window(QWidget):
                 else:
                     result = QMessageBox.question(self, '询问', "需要我帮你配置 frida-server 么?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                     if result == QMessageBox.Yes:
-                        self.download()
-                        setup_frida_server()
-                        start_frida_server()
-                        self.chooseApps()
+                        def finish():
+                            setup_frida_server()
+                            start_frida_server()
+                            self.chooseApps()
+                        self.download(finish)
                     else:
                         QMessageBox.information(self, '提示', '找不到 frida-server 程序')
                     
     
-    def download(self):
+    def download(self,finish):
         progress = QProgressDialog(self)
         progress.setWindowTitle("请稍等")  
         progress.setLabelText("当前车速 0M/S")
@@ -209,8 +210,13 @@ class Window(QWidget):
         progress.canceled.connect(cancel)
 
         def update(args):
-            progress.setValue(float(args[0]))
-            progress.setLabelText("当前车速 %sM/S" % args[1])
+            if args[0] == "over":
+                progress.setValue(100)
+                progress.setLabelText("下载完成")
+                finish()
+            else:
+                progress.setValue(float(args[0]))
+                progress.setLabelText("当前车速 %sM/S" % args[1])
 
         self.download_thread = DownloadThread()
         self.download_thread.start()
