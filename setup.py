@@ -8,13 +8,13 @@ Usage:
 from setuptools import setup
 
 APP = ['ui.py']
-DATA_FILES = []
-OPTIONS = {}
+OPTIONS = {
+    'resources':'r0capture',
+}
 
 setup(
     app=APP,
-    data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
-    install_requires=['requests','frida','hexdump','PyQt5']
+    install_requires=['requests','frida','hexdump','PyQt5'],
 )

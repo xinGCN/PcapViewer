@@ -11,6 +11,8 @@ import subprocess
 import signal
 import os       
 
+import sys
+print(sys.version)
 
 # SUBJECT, SENDER, DATE = range(3)
 NUMBER, TIME, SOURCE, DESTINATION, PROTOCOL, LENGTH, INFO = range(7)
@@ -166,13 +168,20 @@ class Window(QWidget):
                 name,ok = QInputDialog().getItem(window, "选择 App", "可选列表", (app.name for app in apps), 0 , False)
                 if ok:
                     app = [child for child in apps if child.name == name][0]
+                    print(subprocess.check_output("pwd", shell=True))
+
+                    log = 'r0capture/%s.pcap' % app.name
+                    if not os.path.exists(log):
+                        subprocess.call(['touch', log])
+                    
                     if app.pid != 0:
+                        pass
                         # TODO attach 模式
-                        self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U %s -p %s.pcap" % (app.identifier, app.name), shell=True)
+                        self.worker = subprocess.Popen("cd r0capture && %s r0capture.py -U %s -p %s.pcap" % (sys.executable, app.identifier, app.name), shell=True)
                     else:
+                        pass
                         # TODO spawn 模式
-                        self.worker = subprocess.Popen("cd r0capture && python3 r0capture.py -U -f %s -p %s.pcap" % (app.identifier, app.name), shell=True)
-                    print(self.worker)
+                        self.worker = subprocess.Popen("cd r0capture && %s r0capture.py -U -f %s -p %s.pcap" % (sys.executable, app.identifier, app.name), shell=True)
                     self.moniter("r0capture/%s.pcap" % app.name)
         except frida.InvalidArgumentError as e1:
             if str(e1) == "device not found":
@@ -224,9 +233,13 @@ class Window(QWidget):
 
     def closeEvent(self, event):
         if hasattr(self, 'worker'):
-            os.killpg(os.getpgid(self.worker.pid), signal.SIGTERM)
+            # os.killpg(os.getpgid(self.worker.pid), signal.SIGTERM)
+            # terminate 其实并不能真正杀死，需要用 os.killpg，但 os.killpg 会导致 app 崩溃。
+            self.worker.terminate()
         if hasattr(self, 'download_thread'):
             self.download_thread.terminate()
+        if hasattr(self,'monitor_thread'):
+            self.monitor_thread.terminate()
 
 class DownloadThread(QThread):
     trigger = pyqtSignal(list)

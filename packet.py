@@ -44,13 +44,24 @@ class TcpData:
     # https://www.runoob.com/http/http-messages.html
     def __init__(self, b):
         self.raw = b
-        self.info = self.decode(b[:b.index(b'\r\n')])
-        self.header = self.decode(b[b.index(b'\r\n')+2 : b.index(b'\r\n\r\n')])
-        self.body = self.decode(b[b.index(b'\r\n\r\n')+4:])
-        if self.body.find("data_list=") != -1:
-            self.extra = gzip.decompress(base64.b64decode(urllib.parse.unquote(self.body[self.body.find("data_list=") + 10:]))).decode('utf-8')
+
+        idx1 = b.find(b'\r\n')
+        idx2 = b.find(b'\r\n\r\n')
+        if idx1 != -1 and idx2 != -1:
+            self.info = self.decode(b[:idx1])
+            self.header = self.decode(b[idx1+2 : idx2])
+            self.body = self.decode(b[idx2+4:])
+
+            if self.body.find("data_list=") != -1:
+                self.extra = gzip.decompress(base64.b64decode(urllib.parse.unquote(self.body[self.body.find("data_list=") + 10:]))).decode('utf-8')
+            else:
+                self.extra = "解析异常"
         else:
-            self.extra = None
+            self.info = "解析异常"
+            self.header = "解析异常"
+            self.body = "解析异常"
+            self.extra = "解析异常"
+        
 
     def __str__(self):
         return "%s\n%s\n\n%s" % (self.info, self.header, self.body)
