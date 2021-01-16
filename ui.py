@@ -162,6 +162,7 @@ class Window(QWidget):
         self.monitor_thread.trigger.connect(self.addModel)
 
     def chooseApps(self):
+        print("chooseApps")
         try:
             apps = enumerate_apps()
             if apps != None and len(apps) > 0:
@@ -175,24 +176,28 @@ class Window(QWidget):
                         subprocess.call(['touch', log])
                     
                     if app.pid != 0:
-                        pass
                         # TODO attach 模式
                         self.worker = subprocess.Popen("cd r0capture && %s r0capture.py -U %s -p %s.pcap" % (sys.executable, app.identifier, app.name), shell=True)
                     else:
-                        pass
                         # TODO spawn 模式
                         self.worker = subprocess.Popen("cd r0capture && %s r0capture.py -U -f %s -p %s.pcap" % (sys.executable, app.identifier, app.name), shell=True)
+                    r = subprocess.check_output("ps -A | grep r0capture.py",shell=True)
+                    QMessageBox.information(self, '提示', str(r))
                     self.moniter("r0capture/%s.pcap" % app.name)
         except frida.InvalidArgumentError as e1:
             if str(e1) == "device not found":
                 # 处理找不到 usb 设备
                 QMessageBox.information(self, '提示', '找不到 usb 设备')
-        except frida.ServerNotRunningError as e2:
-            if str(e2) == 'unable to connect to remote frida-server: closed':
+        except (frida.ServerNotRunningError, frida.TransportError) as e2:
+            if (str(e2) == 'unable to connect to remote frida-server: closed') or (str(e2) == 'the connection is closed'):
                 # TODO 处理找不到 frida_server 进程
                 if frida_server_exist():
+                    kill_frida_server()
                     start_frida_server()
-                    self.chooseApps()
+                    if frida_server_exist():
+                        self.chooseApps()
+                    else:
+                        QMessageBox.information(self, '提示', 'frida-server 启动异常')
                 else:
                     result = QMessageBox.question(self, '询问', "需要我帮你配置 frida-server 么?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                     if result == QMessageBox.Yes:
@@ -203,7 +208,6 @@ class Window(QWidget):
                         self.download(finish)
                     else:
                         QMessageBox.information(self, '提示', '找不到 frida-server 程序')
-                    
     
     def download(self,finish):
         progress = QProgressDialog(self)

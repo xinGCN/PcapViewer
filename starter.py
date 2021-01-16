@@ -51,15 +51,18 @@ def frida_server_exist():
 
 def kill_frida_server():
     pid = subprocess.check_output("%s shell ps | grep data/local/tmp/frida-server | awk '{print $2}'" % adb, shell=True).decode('utf-8').strip("\n")
-    if pid.isnumeric:
+    print("pid: " + pid + " " + str(pid.isnumeric()))
+    if pid.isnumeric():
+        print("%s shell kill %s" % (adb,pid))
         subprocess.call("%s shell kill %s" % (adb,pid), shell=True)
 
 def start_frida_server():
-    kill_frida_server()
+    #kill_frida_server()
     try:
+        print("%s shell /data/local/tmp/frida-server &" % adb)
         subprocess.call("%s shell /data/local/tmp/frida-server &" % adb, timeout=1, shell=True)
     except subprocess.TimeoutExpired as e:
-        pass
+        print(e)
 
 def setup_frida_server():
     filename = "frida-server-" + find_frida_version() + "-android-x86.xz"
